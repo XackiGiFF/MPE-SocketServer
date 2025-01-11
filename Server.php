@@ -90,6 +90,7 @@ while (true) {
             fwrite($conn, $response . "\n"); // Send response to client
         }
         echo "Msg from client: $data\n"; // Print client data to console
+        fwrite($conn,  "root@socket:~# "); // Send response to client
     }
 
     // Close connection
