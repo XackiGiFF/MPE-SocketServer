@@ -29,8 +29,8 @@ Watch this https://github.com/XackiGiFF/MPE-SocketClient
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
-cd <repository-directory>
+git clone https://github.com/XackiGiFF/MPE-SocketServer.git
+cd MPE-SocketServer
 ```
 
 ### 2. Start the Server
@@ -38,7 +38,7 @@ cd <repository-directory>
 Open a terminal and run the server script:
 
 ```bash
-php server.php
+php Server.php
 ```
 
 ### 3. Start the Client
@@ -46,7 +46,7 @@ php server.php
 Open another terminal and run the client script:
 
 ```bash
-php client.php
+php Client.php
 ```
 
 ### 4. Interact with the Server
