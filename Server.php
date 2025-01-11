@@ -54,7 +54,7 @@ while (true) {
     $conn = stream_socket_accept($socket, -1);
     if ($conn === false) {
         echo "Error while get connection handshake.\n";
-        continue; // Пропускаем итерацию, если не удалось принять соединение
+        continue; //Skip the iteration if the connection could not be accepted.
     }
 
     // Get IP of client
