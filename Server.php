@@ -1,33 +1,4 @@
 <?php
-
-/**
- * MPE Socket Server
- *
- * This script implements a TCP server that handles client connections.
- * The server can send information about itself and process commands from clients.
- *
- * Server Parameters:
- * - Server Name: MPE-SocketServer
- * - Creator: XackiGiFF
- * - Version: 1.0
- * - Creation Date: [creation date]
- * - Operating System: [OS information]
- *
- * Usage:
- * - Command 'info' to get information about the server.
- * - Command 'exit' to disconnect the client.
- * - Command 'stop' to stop the server.
- *
- * Running the Server:
- * - Ensure that port 12345 is free and available.
- * - Run this script in the terminal.
- *
- * @author XackiGiFF
- * @version 1.0
- * @date [2025/01/11]
- */
-
-
 // We specify the port and address for the server
 $address = '127.0.0.1';
 $port = 12345;
@@ -49,50 +20,96 @@ if (!$socket) {
 
 echo "Server starts on $address:$port...\n";
 
+$clients = []; // Array to hold connected clients
+$clients[(int)$socket] = $socket; // Add server socket to clients array
+$usernames = [];
+
 while (true) {
-    // Waiting clients
-    $conn = stream_socket_accept($socket, -1);
-    if ($conn === false) {
-        echo "Error while get connection handshake.\n";
-        continue; //Skip the iteration if the connection could not be accepted.
+    $read = $clients; // Copy clients array for stream_select
+    // Wait for activity on any of the sockets
+    $var = $write = null;
+    $var1 = $except = null;
+    if (stream_select($read, $var, $var1, 0) === false) {
+        echo "Error in stream_select.\n";
+        break;
     }
 
-    // Get IP of client
-    $clientInfo = stream_socket_get_name($conn, true);
-    echo "New client connected: $clientInfo\n";
-    // Приветственное сообщение
-    $wellcome = "🌟 Добро пожаловать на сервер! 🌟\n" .
-        "👤 Ваш IP: $clientInfo\n" .
-        "💬 Используйте команду 'info' для получения информации о сервере.\n" .
-        "❌ Для отключения от сервера введите 'exit'.\n" .
-        "⏹️ Для остановки сервера введите 'stop'.\n" .
-        "🎉 Спасибо, что подключились! Приятного общения! 🎉";
-    fwrite($conn, $wellcome . "\nroot@socket:~# "); // Send response to client
+    foreach ($read as $conn) {
+        // If the server socket is readable, a new client is connecting
+        if ($conn === $socket) {
+            $newConn = stream_socket_accept($socket);
+            if ($newConn) {
+                $clients[(int)$newConn] = $newConn; // Add new client to the clients array
+                $clientInfo = stream_socket_get_name($newConn, true);
+                echo "New client connected: $clientInfo\n";
 
-    // Processing data from the client
-    while ($data = fread($conn, 1024)) {
-        $data = trim($data);
-        if ($data === 'exit') {
-            echo "The client has disconnected.\n";
-            break; // Exiting the inner loop with the 'exit' command
+                // Приветственное сообщение
+                $wellcome = "🌟 Добро пожаловать на сервер! 🌟" . "\n" .
+                    "👤 Ваш IP: $clientInfo\n" .
+                    "💬 Используйте команду 'info' для получения информации о сервере.\n" .
+                    "❌ Для отключения от сервера введите 'exit'.\n" .
+                    "⏹️ Для остановки сервера введите 'stop'.\n" .
+                    "🎉 Спасибо, что подключились! Приятного общения! 🎉" . "\n" .
+                    "[" . $usernames[(int)$conn] . "] >";
+                fwrite($newConn, json_encode( $wellcome ) ); // Send response to client
+            }
+        } else {
+            // Processing data from the client
+            $data = fread($conn, 1024);
+            if ($data === false || $data === '') {
+                // Client has disconnected
+                echo "Client disconnected: " . stream_socket_get_name($conn, true) . "\n";
+                fclose($conn);
+                unset($clients[(int)$conn]); // Remove client from the list
+                continue;
+            }
+
+            $cmd = json_decode( $data );
+
+            if(isset($cmd->username)) {
+                $usernames[(int)$conn] = $cmd->username;
+            }
+
+            if(isset($cmd->message)) {
+                if ($cmd->message == 'exit') {
+                    echo "The client has disconnected.\n";
+                    fclose($conn);
+                    unset($clients[(int)$conn]); // Remove client from the list
+                    continue; // Exit the loop for this client
+                }
+                if ($cmd->message == 'stop') {
+                    echo "Close sockets...\n";
+                    foreach ($clients as $client) {
+                        fclose($client); // Closing all client connections
+                    }
+                    fclose($socket); // Closing the server socket
+                    echo "Server was stopped.\n";
+                    exit; // Completing the script execution
+                }
+                if ($cmd->message == 'info') {
+                    $nowtime = date("Y-m-d H:i:s");
+                    global $serverName, $creator, $version, $creationDate, $os, $ramUsage, $cpuUsage;
+                    $response = "[$serverName] $nowtime > \n - Creator: {$creator}, \n - Ver: {$version}, \n - Date: {$creationDate}, \n - OS: {$os}, \n - RAM: " . round($ramUsage, 2) . " MB, \n - CPU: " . round($cpuUsage, 2) . "%";
+                    fwrite($conn, json_encode( $response . "\n") ); // Send response to client
+                    continue; // Exit the loop for this client
+                }
+            }
+
+            // Broadcast message to all clients except the sender
+            foreach ($clients as $client) {
+                // Проверяем, что клиент не является отправителем
+                if ($client !== $conn ) {
+                    // Отправляем сообщение другим клиентам
+                    if(isset($cmd->message)) {
+                        // Send message to other clients
+                        if (is_resource($client)) {
+                            fwrite($client, json_encode("\n[" . $usernames[(int)$conn] . '] > ' . $cmd->message . "\n"));
+                        }
+                    }
+                }
+            }
+
+            fwrite($conn, json_encode( "[" . $usernames[(int)$conn] . '] > ' ) ); // Отправляем ответ клиенту
         }
-        if ($data === 'stop') {
-            echo "Close sockets...\n";
-            fclose($conn); // Closing the connection with the client before stopping the server
-            fclose($socket); // Closing the server socket
-            echo "Server was stopped.\n";
-            exit; // Completing the script execution
-        }
-        if ($data === 'info') {
-            $nowtime = date("Y-m-d H:i:s");
-            global $serverName, $creator, $version, $creationDate, $os, $ramUsage, $cpuUsage;
-            $response = "[$serverName] $nowtime > \n - Creator: {$creator}, \n - Ver: {$version}, \n - Date: {$creationDate}, \n - OS: {$os}, \n - RAM: " . round($ramUsage, 2) . " MB, \n - CPU: " . round($cpuUsage, 2) . "%";
-            fwrite($conn, $response . "\n"); // Send response to client
-        }
-        echo "Msg from client: $data\n"; // Print client data to console
-        fwrite($conn,  "root@socket:~# "); // Send response to client
     }
-
-    // Close connection
-    fclose($conn);
 }
