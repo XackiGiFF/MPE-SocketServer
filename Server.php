@@ -85,6 +85,7 @@ while (true) {
         }
         if ($data === 'info') {
             $nowtime = date("Y-m-d H:i:s");
+            global $serverName, $creator, $version, $creationDate, $os, $ramUsage, $cpuUsage;
             $response = "[$serverName] $nowtime > \n - Creator: {$creator}, \n - Ver: {$version}, \n - Date: {$creationDate}, \n - OS: {$os}, \n - RAM: " . round($ramUsage, 2) . " MB, \n - CPU: " . round($cpuUsage, 2) . "%";
             fwrite($conn, $response . "\n"); // Send response to client
         }
